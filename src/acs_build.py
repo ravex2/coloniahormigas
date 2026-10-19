@@ -46,10 +46,6 @@ def inicializar_feromona(datos, tipo=TipoProblema.PFSP):
 def construir_colonia(datos, hormigas, feromona, heuristica, alpha, beta, q0,
                       tau0, rng, tipo=TipoProblema.PFSP):
     """Construye y evalúa una ruta por hormiga para una iteración de ACS.
-
-    Las hormigas comparten feromona, pero cada una conserva su propia lista de
-    nodos disponibles. La actualización local ocurre durante la construcción;
-    la actualización global corresponde al ejecutor al terminar esta colonia.
     """
     nodos = datos.shape[1]
     soluciones = []
@@ -106,7 +102,6 @@ def actualizar_feromona_global(feromona, ruta, mejor_costo, alpha, inicio=None, 
 
     # Parte alpha * Delta: solo los arcos de la mejor ruta reciben refuerzo positivo.
     deposito = 1.0 / mejor_costo
-    # PFSP usa un nodo artificial inicial; TSP usa directamente el primer nodo del tour.
     recorrido = ([inicio] if inicio is not None else []) + ruta.tolist()
     if cerrar_ciclo:
         recorrido.append(ruta[0])
@@ -144,12 +139,10 @@ def ejecutar_acs(tiempos, hormigas, iteraciones, alpha, beta, q0, semilla,
             tiempos, hormigas, feromona, heuristica, alpha, beta, q0, tau0, rng
         )
 
-        # Solo se reemplaza la memoria global si este ciclo encontró una mejor solución.
         candidata, costo = min(soluciones, key=lambda par: par[1])
         if costo < mejor_costo:
             mejor_global, mejor_costo = candidata.copy(), costo
 
-        # Ecuación (3): evaporación global y refuerzo de la mejor solución conocida.
         actualizar_feromona_global(feromona, mejor_global, mejor_costo, alpha, inicio)
         historia.append(int(mejor_costo))
 
@@ -163,7 +156,6 @@ def leer_tsplib(ruta, mejor_conocido=None):
     with open(ruta, encoding="utf-8") as archivo:
         lineas = archivo.read().splitlines()
     inicio, fin = lineas.index("NODE_COORD_SECTION"), lineas.index("EOF")
-    # pandas carga solo filas ``id x y``; no se asume que el dataset tenga 52 nodos.
 
     tabla = pd.read_table(ruta, header=None, sep=r"\s+", skiprows=inicio + 1, nrows=fin - inicio - 1)
     coordenadas = tabla.drop(columns=0).to_numpy(dtype=float)
@@ -208,7 +200,6 @@ def ejecutar_acs_berlin52(coordenadas, hormigas, iteraciones, alpha, beta, q0, s
     distancias = matriz_distancias(coordenadas)
     rng = np.random.default_rng(semilla)
 
-    # eta_ij es inversamente proporcional a la distancia; en la diagonal no hay arco válido.
     heuristica = calcular_heuristica(distancias, TipoProblema.TSP)
     feromona, tau0 = inicializar_feromona(distancias, TipoProblema.TSP)
     mejor_global, mejor_costo, historia = None, float("inf"), []
@@ -224,7 +215,6 @@ def ejecutar_acs_berlin52(coordenadas, hormigas, iteraciones, alpha, beta, q0, s
             mejor_global, mejor_costo = candidata.copy(), costo
         actualizar_feromona_global(feromona, mejor_global, mejor_costo, alpha, cerrar_ciclo=True)
         historia.append(mejor_costo)
-        # Estado posterior a la actualización global, sin alterar la ejecución.
         if observador is not None:
             observador(dict(iteracion=len(historia), ruta=mejor_global.tolist(),
                             costo=float(mejor_costo),
